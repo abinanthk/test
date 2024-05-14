@@ -1,85 +1,128 @@
-import { ComponentProps, useEffect } from "react";
-import { SelectProvider, useSelectContext } from "./Select.store";
+import {
+  SelectProps,
+  SelectSelectedProps,
+  SelectUnSelectedProps,
+  SelectToggleProps,
+  SelectLabelProps,
+  SelectOptionProps,
+  SelectTriggerProps,
+  SelectContentProps,
+} from "./Select.types";
+import {
+  SelectContext,
+  useSelect,
+  useSelectOptionStoreInContext,
+  SelectOptionContext,
+  useSelectOption,
+  useSelectStoreInContext,
+} from "./Select.hooks";
+import { useEffect, useRef, useState } from "react";
 
-type SelectProps = ComponentProps<"div">;
-
-export function Select({ className, ...props }: SelectProps) {
-  const Select_ = () => {
-    const ctx = useSelectContext((state) => state.selected);
-    console.log("Select", ctx);
-
-    useEffect(() => {
-      props.onChange?.(ctx);
-    }, [ctx]);
-
-    return <div className={"flex flex-col bg-slate-700"}>{props.children}</div>;
-  };
-
+// Select provider for using multiple instance
+export function Select({ defaultValue, onChange, ...props }: SelectProps) {
+  const _store = useSelect({
+    defaultValue,
+    onChange: onChange,
+  });
   return (
-    <SelectProvider>
-      <Select_ />
-    </SelectProvider>
+    <SelectContext.Provider value={_store}>
+      <div {...props} />
+    </SelectContext.Provider>
   );
 }
 
-Select.Trigger = function (props: any) {
-  const ctx = useSelectContext();
+Select.Option = ({
+  defaultChecked,
+  value,
+  onChange,
+  ...props
+}: SelectOptionProps) => {
+  const _store = useSelectOption({
+    isSelected: defaultChecked,
+    value,
+    onChange: onChange,
+  });
 
-  if (!ctx) {
-    return;
-  }
-
-  const { setVisible } = ctx;
-
-  const handleTrigger = () => {
-    console.log("handleTrigger");
-    setVisible();
-  };
   return (
-    <span
-      className="bg-red-700 text-white hover:cursor-pointer"
-      onClick={handleTrigger}
-    >
-      {props.children}
-    </span>
+    <SelectOptionContext.Provider value={_store}>
+      <div {...props} />
+    </SelectOptionContext.Provider>
   );
 };
 
-Select.Options = function (props: { children: React.ReactNode }) {
-  const ctx = useSelectContext();
+Select.Selected = (props: SelectSelectedProps) => {
+  const isSelected = useSelectOptionStoreInContext<boolean>(
+    (state) => state.isSelected
+  );
 
-  if (!ctx) {
-    return;
-  }
-
-  const { visible } = ctx;
-
-  return visible ? props.children : null;
+  return isSelected ? <div {...props} /> : null;
 };
 
-Select.Option = function (props: { value: string; children: React.ReactNode }) {
-  const ctx = useSelectContext();
-  console.log("Option", ctx);
+Select.UnSelected = (props: SelectUnSelectedProps) => {
+  const isSelected = useSelectOptionStoreInContext<boolean>(
+    (state) => state.isSelected
+  );
 
-  if (!ctx) {
-    return;
-  }
+  return isSelected ? null : <div {...props} />;
+};
 
-  const { setOptions, setSelected, setVisible } = ctx;
+Select.Toggle = (props: SelectToggleProps) => {
+  const toggle = useSelectOptionStoreInContext<() => void>(
+    (state) => state.toggle
+  );
+
+  return (
+    <div
+      {...props}
+      onClick={(e) => {
+        toggle();
+        props.onClick?.(e);
+      }}
+    />
+  );
+};
+
+Select.Label = (props: SelectLabelProps) => {
+  return <label {...props} />;
+};
+
+// /////////////////
+Select.Trigger = (props: SelectTriggerProps) => {
+  const toggle = useSelectStoreInContext((state) => state.toggle);
+  const _ref = useSelectStoreInContext((state) => state._ref);
+
+  return (
+    <div
+      {...props}
+      ref={_ref}
+      onClick={(e) => {
+        toggle();
+        props.onClick?.(e);
+      }}
+    />
+  );
+};
+
+Select.Content = (props: SelectContentProps) => {
+  const isOpen = useSelectStoreInContext((state) => state.isOpen);
+  const _ref = useSelectStoreInContext((state) => state._ref);
+
+  const [pos, setPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    setOptions(props.value);
+    if (!_ref) {
+      return;
+    }
+
+    console.log("_ref", _ref.current.getBoundingClientRect());
+
+    setPos({
+      x: _ref.current.getBoundingClientRect().y + _ref.current.getBoundingClientRect().height,
+      y: _ref.current.getBoundingClientRect().x,
+    });
   }, []);
 
-  const handleSelect = () => {
-    console.log("handleSelect");
-    setSelected(props.value);
-    setVisible(false);
-  };
-
-  return (
-    <span className="hover:cursor-pointer" onClick={handleSelect}>
-      {props.children}
-    </span>
-  );
+  return isOpen ? (
+    <div {...props} style={{ position: "absolute", top: pos.x, left: pos.y }} />
+  ) : null;
 };
