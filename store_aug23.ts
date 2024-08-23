@@ -10,7 +10,7 @@ type TStore = {
   reset: () => void;
 };
 
-const makeSubjects = (state: any, subscription: any) => {
+const createSubjects = (state: any, subscription: any) => {
   const _subjects: any = {};
 
   Object.entries(state).forEach(([key, value]) => {
@@ -28,7 +28,7 @@ const makeSubjects = (state: any, subscription: any) => {
   return _subjects;
 };
 
-const makeProxy = (state: any, prevState: any, subjects: any) => {
+const createProxy = (state: any, prevState: any, subjects: any) => {
   const _proxy = new Proxy(state, {
     get(target, prop) {
       return Reflect.get(target, prop);
@@ -55,10 +55,10 @@ export const createStore = <TState extends {}>(
 ) => {
   const _state: any = { ...initState };
   const _prevState: any = { ...initState };
-  const _subjects: any = makeSubjects(initState, subscription);
+  const _subjects: any = createSubjects(initState, subscription);
 
   const _store: TStore = {
-    state: makeProxy(_state, _prevState, _subjects),
+    state: createProxy(_state, _prevState, _subjects),
     prevState: _prevState,
     subjects: _subjects,
     onUpdate() {},
