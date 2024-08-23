@@ -14,23 +14,39 @@ const makeSubjects = (state: any, subscription: any) => {
   const _subjects: any = {};
 
   Object.entries(state).forEach(([key, value]) => {
-    console.log("---", key, subscription[key]);
-
     if (typeof state[key] === "function") {
-      console.log("--- not subscribed function", key);
       return;
     }
 
     if (subscription[key] === false) {
-      console.log("--- not subscribed false", key);
       return;
     }
 
-    console.log("--- subscribed", key);
     _subjects[key] = new BehaviorSubject(value);
   });
 
   return _subjects;
+};
+
+const makeProxy = (state: any, prevState: any, subjects: any) => {
+  const _proxy = new Proxy(state, {
+    get(target, prop) {
+      return Reflect.get(target, prop);
+    },
+    set(target, prop, value) {
+      prevState[prop] = state[prop];
+
+      if (!Reflect.set(target, prop, value)) {
+        return false;
+      }
+
+      subjects[prop]?.next(value);
+
+      return true;
+    },
+  });
+
+  return _proxy;
 };
 
 export const createStore = <TState extends {}>(
@@ -41,27 +57,10 @@ export const createStore = <TState extends {}>(
   const _prevState: any = { ...initState };
   const _subjects: any = makeSubjects(initState, subscription);
 
-  console.log("_subjects", _subjects);
-
   const _store: TStore = {
-    subjects: _subjects,
+    state: makeProxy(_state, _prevState, _subjects),
     prevState: _prevState,
-    state: new Proxy(_state, {
-      get(target, prop) {
-        return Reflect.get(target, prop);
-      },
-      set(target, prop, value) {
-        _prevState[prop] = _state[prop];
-
-        if (!Reflect.set(target, prop, value)) {
-          return false;
-        }
-
-        _subjects[prop]?.next(value);
-
-        return true;
-      },
-    }),
+    subjects: _subjects,
     onUpdate() {},
     reset() {
       Object.entries(initState).forEach(([key, value]) => {
@@ -90,15 +89,9 @@ export const useStoreState = <T>(store: TStore): T => {
 export const useStore = <T>(store: TStore, sub: string) => {
   const forceUpdate = useForceUpdate();
 
-  console.log("-----------", store);
-
   useEffect(() => {
     store.subjects[sub]?.subscribe((value: any) => {
-      console.log("key : ", sub);
-      console.log("value : ", value);
-      console.log("store.prevState[sub] : ", store.prevState[sub]);
       if (store.prevState[sub] !== value) {
-        console.log("update----------");
         forceUpdate();
       }
     });
